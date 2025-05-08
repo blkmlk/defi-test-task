@@ -1,0 +1,11 @@
+rpc_url: "http://127.0.0.1:8899"
+
+senders:
+  - private_key: "./sender1.json"
+  - private_key: "./sender2.json"
+
+receivers:
+  - address: "AP7RuKE5BACZWpUF9ToucceSRPLywjDTXesfytEXQEPG"
+  - address: "GWh62MMGEkdpEKJFntR98XXPc6BgcBBBPtNNQzh2S4ZQ"
+
+amount: 0.01
