@@ -1,34 +1,46 @@
 mod config;
 
+use anyhow::{anyhow, Context};
+use clap::Parser;
 use config::Config;
+use futures_util::{SinkExt, StreamExt};
 use solana_client::rpc_client::RpcClient;
+use solana_sdk::commitment_config::CommitmentLevel;
+use solana_sdk::signature::{Keypair, Signature};
 use solana_sdk::{
     pubkey::Pubkey,
     signature::{read_keypair_file, Signer},
     system_instruction,
     transaction::Transaction,
 };
+use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
-use anyhow::{anyhow, Context};
-use clap::Parser;
-use futures_util::{SinkExt, StreamExt};
-use solana_sdk::signature::{Keypair, Signature};
-use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient};
+use yellowstone_grpc_client::{ClientTlsConfig, GeyserGrpcClient, Interceptor};
 use yellowstone_grpc_proto::geyser::subscribe_update::UpdateOneof;
-use yellowstone_grpc_proto::geyser::{SubscribeRequest, SubscribeRequestPing};
+use yellowstone_grpc_proto::geyser::{
+    SubscribeRequest, SubscribeRequestFilterBlocks, SubscribeRequestPing,
+};
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long, default_value = "config.yaml")]
+    #[arg(default_value = "config.yaml")]
     config: String,
+}
+
+fn load_config<P: AsRef<Path>>(path: P) -> anyhow::Result<Config> {
+    let file = File::open(path)?;
+    Ok(serde_yaml::from_reader(file)?)
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
-    let config = Config::from_yaml(&args.config)?;
-    let payer = read_keypair_file(&config.payer_keypair).map_err(|e| anyhow!("invalid keypair: {:?}", e))?;
+    let config = load_config(args.config)?;
+    let payer = read_keypair_file(&config.payer_keypair)
+        .map_err(|e| anyhow!("invalid keypair: {:?}", e))?;
     let receiver = Pubkey::from_str(&config.receiver_pubkey)?;
 
     let rpc_client = RpcClient::new(config.rpc_url.clone());
@@ -43,8 +55,22 @@ async fn main() -> anyhow::Result<()> {
         .await
         .context("failed to build a geyser client")?;
 
+    let mut blocks_filter = HashMap::new();
+    blocks_filter.insert(
+        "block_subscription".to_string(),
+        SubscribeRequestFilterBlocks {
+            account_include: vec![], // Optional: specify accounts to filter
+            include_transactions: Some(true),
+            include_accounts: Some(true),
+            include_entries: Some(false),
+        },
+    );
 
-    let req = SubscribeRequest::default();
+    let req = SubscribeRequest {
+        blocks: blocks_filter,
+        commitment: Some(CommitmentLevel::Confirmed as i32),
+        ..Default::default()
+    };
 
     let (mut subscribe_tx, mut stream) = client.subscribe_with_request(Some(req)).await?;
 
@@ -52,7 +78,15 @@ async fn main() -> anyhow::Result<()> {
         match message {
             Ok(msg) => match msg.update_oneof {
                 Some(UpdateOneof::Block(_)) => {
-                    send_tx(&rpc_client, &payer, &receiver, config.transfer_amount_lamports).await?;
+                    println!("new block is received");
+                    send_tx(
+                        &rpc_client,
+                        &payer,
+                        &receiver,
+                        config.transfer_amount_lamports,
+                    )
+                    .await?;
+                    println!("new tx is sent");
                 }
                 Some(UpdateOneof::Ping(_)) => {
                     subscribe_tx
@@ -64,13 +98,13 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Some(UpdateOneof::Pong(_)) => {}
                 None => {
-                    // error!("update not found in the message");
+                    eprintln!("updated not found");
                     break;
                 }
                 _ => {}
             },
-            Err(error) => {
-                // error!("error: {error:?}");
+            Err(e) => {
+                eprintln!("failed to receive message: {}", e);
                 break;
             }
         }
@@ -79,12 +113,13 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn send_tx(client: &RpcClient, payer: &Keypair, receiver: &Pubkey, amount: u64) -> anyhow::Result<Signature> {
-    let ix = system_instruction::transfer(
-        &payer.pubkey(),
-        receiver,
-        amount,
-    );
+async fn send_tx(
+    client: &RpcClient,
+    payer: &Keypair,
+    receiver: &Pubkey,
+    amount: u64,
+) -> anyhow::Result<Signature> {
+    let ix = system_instruction::transfer(&payer.pubkey(), receiver, amount);
     let recent_blockhash = client.get_latest_blockhash()?;
     let tx = Transaction::new_signed_with_payer(
         &[ix],
@@ -93,5 +128,7 @@ async fn send_tx(client: &RpcClient, payer: &Keypair, receiver: &Pubkey, amount:
         recent_blockhash,
     );
 
-    client.send_and_confirm_transaction(&tx).map_err(|e| anyhow!(e.to_string()))
+    client
+        .send_transaction(&tx)
+        .map_err(|e| anyhow!(e.to_string()))
 }

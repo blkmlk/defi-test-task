@@ -1,5 +1,6 @@
-rpc_url: "https://api.mainnet-beta.solana.com"
-payer_keypair: "/path/to/id.json"
-receiver_pubkey: "TargetPublicKeyHere"
+rpc_url: "http://127.0.0.1:8899"
+payer_keypair: "./payer.json"
+receiver_pubkey: "GWh62MMGEkdpEKJFntR98XXPc6BgcBBBPtNNQzh2S4ZQ"
 transfer_amount_lamports: 10000
-geyser_grpc_address: "http://localhost:10000"
+geyser_grpc_address: "https://grpc.ny.shyft.to"
+geyser_token: "b2b972c6-fff2-4b5c-aac9-375c6984b80e"
