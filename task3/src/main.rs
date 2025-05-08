@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     blocks_filter.insert(
         "block_subscription".to_string(),
         SubscribeRequestFilterBlocks {
-            account_include: vec![], // Optional: specify accounts to filter
+            account_include: vec![],
             include_transactions: Some(true),
             include_accounts: Some(true),
             include_entries: Some(false),

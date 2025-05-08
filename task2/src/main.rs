@@ -6,7 +6,7 @@ use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
 use solana_sdk::{
     pubkey::Pubkey,
-    signature::{Keypair, Signer},
+    signature::Signer,
     system_instruction,
     transaction::Transaction,
 };
@@ -39,10 +39,6 @@ struct Config {
 fn load_config<P: AsRef<Path>>(path: P) -> Result<Config> {
     let file = File::open(path)?;
     Ok(serde_yaml::from_reader(file)?)
-}
-
-fn wallet_from_bytes(bytes: &[u8]) -> Result<Keypair> {
-    Keypair::from_bytes(bytes).map_err(|e| anyhow!("Invalid keypair: {e}"))
 }
 
 #[tokio::main]
@@ -100,7 +96,7 @@ async fn main() -> Result<()> {
                 successes += 1;
                 txs.push(sig);
             }
-            Err(e) => println!("Error: {:?}", e),
+            Err(e) => eprintln!("Error: {:?}", e),
         }
     }
 
