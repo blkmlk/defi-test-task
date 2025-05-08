@@ -1,5 +1,6 @@
 use anyhow::Context;
-use futures::future::join_all;
+use futures::stream::FuturesUnordered;
+use futures::StreamExt;
 use serde::Deserialize;
 use serde_yaml;
 use solana_client::nonblocking::rpc_client::RpcClient;
@@ -19,9 +20,11 @@ async fn main() -> anyhow::Result<()> {
     let rpc_url = "https://api.mainnet-beta.solana.com";
     let client = RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::confirmed());
 
-    let tasks = config.wallets.iter().map(|addr| {
-        let addr = addr.clone();
-        async {
+    let mut futures = FuturesUnordered::new();
+
+    for addr in config.wallets.iter() {
+        let client = &client;
+        let f = async move {
             let pubkey = addr.parse::<Pubkey>().expect("Invalid pubkey");
             match client.get_balance(&pubkey).await {
                 Ok(balance) => Some((addr, balance)),
@@ -30,13 +33,14 @@ async fn main() -> anyhow::Result<()> {
                     None
                 }
             }
+        };
+        futures.push(f);
+    }
+
+    while let Some(res) = futures.next().await {
+        if let Some((addr, balance)) = res {
+            println!("Wallet: {}, Balance: {} lamports", addr, balance);
         }
-    });
-
-    let results = join_all(tasks).await;
-
-    for result in results.into_iter().flatten() {
-        println!("Wallet: {}, Balance: {} lamports", result.0, result.1);
     }
 
     Ok(())
