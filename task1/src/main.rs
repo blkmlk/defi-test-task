@@ -1,9 +1,10 @@
+use anyhow::Context;
+use futures::future::join_all;
+use serde::Deserialize;
+use serde_yaml;
 use solana_client::nonblocking::rpc_client::RpcClient;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey};
-use serde::Deserialize;
 use std::fs::File;
-use futures::future::join_all;
-use serde_yaml;
 
 #[derive(Debug, Deserialize)]
 struct Config {
@@ -11,15 +12,12 @@ struct Config {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let file = File::open("config.yaml")?;
-    let config: Config = serde_yaml::from_reader(file)?;
+async fn main() -> anyhow::Result<()> {
+    let file = File::open("config.yaml").context("failed to open config.yaml")?;
+    let config: Config = serde_yaml::from_reader(file).context("failed to parse config.yaml")?;
 
     let rpc_url = "https://api.mainnet-beta.solana.com";
-    let client = RpcClient::new_with_commitment(
-        rpc_url.to_string(),
-        CommitmentConfig::confirmed(),
-    );
+    let client = RpcClient::new_with_commitment(rpc_url.to_string(), CommitmentConfig::confirmed());
 
     let tasks = config.wallets.iter().map(|addr| {
         let addr = addr.clone();
