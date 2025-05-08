@@ -21,7 +21,6 @@ struct Config {
     rpc_url: String,
     private_key: String,
     program_id: String,
-    vault_account: String,
 }
 
 #[derive(Parser)]
