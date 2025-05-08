@@ -1,3 +1,4 @@
+use borsh::BorshDeserialize;
 use sha2::Digest;
 use sha2::Sha256;
 use solana_sdk::{
@@ -6,6 +7,12 @@ use solana_sdk::{
     signature::Signer,
     system_program,
 };
+
+#[derive(Debug, BorshDeserialize)]
+pub struct Vault {
+    pub owner: Pubkey,
+    pub balance: u64,
+}
 
 fn anchor_discriminator(name: &str) -> [u8; 8] {
     let mut hasher = Sha256::new();
@@ -43,7 +50,11 @@ pub fn encode_deposit_ix(
 
     Instruction {
         program_id,
-        accounts: vec![AccountMeta::new(vault, false), AccountMeta::new(user, true)],
+        accounts: vec![
+            AccountMeta::new(vault, false),
+            AccountMeta::new(user, true),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ],
         data,
     }
 }
@@ -60,7 +71,11 @@ pub fn encode_withdraw_ix(
 
     Instruction {
         program_id,
-        accounts: vec![AccountMeta::new(vault, false), AccountMeta::new(user, true)],
+        accounts: vec![
+            AccountMeta::new(vault, false),
+            AccountMeta::new(user, true),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ],
         data,
     }
 }

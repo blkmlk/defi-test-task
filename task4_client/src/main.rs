@@ -2,6 +2,7 @@ mod vault;
 
 use anyhow::{anyhow, Context};
 use base64::Engine;
+use borsh::BorshDeserialize;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
 use sha2::Digest;
@@ -26,7 +27,8 @@ struct Config {
 #[derive(Parser)]
 #[command(name = "vault-cli")]
 #[command(about = "CLI to interact with Anchor deposit contract", long_about = None)]
-struct Cli {
+struct Args {
+    config: String,
     #[command(subcommand)]
     command: Commands,
 }
@@ -39,9 +41,9 @@ enum Commands {
     Balance,
 }
 
-fn load_config() -> anyhow::Result<Config> {
-    let content = fs::read_to_string("config.yaml").expect("Cannot read config.yaml");
-    let cfg: Config = serde_yaml::from_str(&content).expect("Invalid config");
+fn load_config(file_path: &str) -> anyhow::Result<Config> {
+    let content = fs::read_to_string(file_path).context("Cannot read config.yaml")?;
+    let cfg: Config = serde_yaml::from_str(&content).context("Invalid config")?;
 
     Ok(cfg)
 }
@@ -67,9 +69,9 @@ fn send_tx(
 }
 
 fn main() -> anyhow::Result<()> {
-    let args = Cli::parse();
-    let cfg = load_config().context("Failed to load config")?;
-    let rpc = RpcClient::new_with_commitment(cfg.rpc_url, CommitmentConfig::confirmed());
+    let args = Args::parse();
+    let cfg = load_config(&args.config).context("Failed to load config")?;
+    let rpc = RpcClient::new_with_commitment(cfg.rpc_url, CommitmentConfig::default());
 
     let payer =
         read_keypair_file(&cfg.private_key).map_err(|e| anyhow!("invalid keypair: {:?}", e))?;
@@ -100,7 +102,11 @@ fn main() -> anyhow::Result<()> {
         }
 
         Commands::Balance => match rpc.get_account(&vault_pda) {
-            Ok(acc) => println!("Vault PDA holds: {} lamports", acc.lamports),
+            Ok(acc) => {
+                let vault = vault::Vault::try_from_slice(&acc.data[8..])
+                    .context("Invalid vault account")?;
+                println!("Vault balance (in state): {} lamports", vault.balance);
+            }
             Err(_) => println!("Vault not initialized"),
         },
     }
