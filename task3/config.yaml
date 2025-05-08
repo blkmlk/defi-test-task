@@ -1,0 +1,5 @@
+rpc_url: "https://api.mainnet-beta.solana.com"
+payer_keypair: "/path/to/id.json"
+receiver_pubkey: "TargetPublicKeyHere"
+transfer_amount_lamports: 10000
+geyser_grpc_address: "http://localhost:10000"
