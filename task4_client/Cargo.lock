@@ -5243,7 +5243,6 @@ name = "task4_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
  "borsh 0.10.4",
  "clap",
  "serde",

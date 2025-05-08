@@ -1,11 +1,9 @@
 mod vault;
 
 use anyhow::{anyhow, Context};
-use base64::Engine;
 use borsh::BorshDeserialize;
 use clap::{Parser, Subcommand};
 use serde::Deserialize;
-use sha2::Digest;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
 use solana_sdk::{

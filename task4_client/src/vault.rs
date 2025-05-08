@@ -4,7 +4,6 @@ use sha2::Sha256;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
-    signature::Signer,
     system_program,
 };
 
